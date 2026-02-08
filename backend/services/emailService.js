@@ -1,18 +1,9 @@
-import nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-// Create reusable transporter using Gmail SMTP
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.GMAIL_USER,
-      pass: process.env.GMAIL_APP_PASSWORD
-    }
-  });
-};
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /**
  * Send invitation email with onboarding link and OTP
@@ -23,19 +14,13 @@ const createTransporter = () => {
  */
 export const sendInvitationEmail = async (email, employeeName, onboardingUrl, otp) => {
   try {
-    // Validate email configuration
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-      console.error('❌ Gmail credentials not configured. Please set GMAIL_USER and GMAIL_APP_PASSWORD in .env');
+    if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+      console.error('❌ Resend not configured. Please set RESEND_API_KEY and EMAIL_FROM in .env');
       throw new Error('Email service not configured');
     }
 
-    const transporter = createTransporter();
-
-    const mailOptions = {
-      from: `"Xpect Group" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Xpect Group – Employee Onboarding Invitation',
-      html: `
+    const subject = 'Xpect Group – Employee Onboarding Invitation';
+    const html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -74,8 +59,8 @@ export const sendInvitationEmail = async (email, employeeName, onboardingUrl, ot
           </div>
         </body>
         </html>
-      `,
-      text: `
+      `;
+    const text = `
 Xpect Group – Employee Onboarding Invitation
 
 Welcome to Xpect Group, ${employeeName}!
@@ -96,25 +81,35 @@ Instructions:
 
 If you did not expect this invitation, please ignore this email.
 This is an automated message from Xpect Group.
-      `
-    };
+      `;
 
-    const info = await transporter.sendMail(mailOptions);
-    
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM,
+      to: [email],
+      subject,
+      html,
+      text
+    });
+
+    if (error) {
+      console.error('❌ Resend error sending email:', error);
+      throw new Error('Failed to send email');
+    }
+
     console.log('✅ Email sent successfully:', {
-      messageId: info.messageId,
+      messageId: data?.id,
       to: email,
-      subject: mailOptions.subject
+      subject
     });
 
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: data?.id,
       to: email
     };
   } catch (error) {
     console.error('❌ Error sending email:', error);
-    throw new Error(`Failed to send email: ${error.message}`);
+    throw new Error('Failed to send email');
   }
 };
 
@@ -127,18 +122,13 @@ This is an automated message from Xpect Group.
  */
 export const sendOTPResendEmail = async (email, employeeName, onboardingUrl, otp) => {
   try {
-    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-      console.error('❌ Gmail credentials not configured');
+    if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+      console.error('❌ Resend not configured. Please set RESEND_API_KEY and EMAIL_FROM in .env');
       throw new Error('Email service not configured');
     }
 
-    const transporter = createTransporter();
-
-    const mailOptions = {
-      from: `"Xpect Group" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Xpect Group – Your Onboarding OTP',
-      html: `
+    const subject = 'Xpect Group – Your Onboarding OTP';
+    const html = `
         <!DOCTYPE html>
         <html>
         <head>
@@ -170,8 +160,8 @@ export const sendOTPResendEmail = async (email, employeeName, onboardingUrl, otp
           </div>
         </body>
         </html>
-      `,
-      text: `
+      `;
+    const text = `
 Xpect Group – Your Onboarding OTP
 
 Dear ${employeeName},
@@ -186,23 +176,33 @@ Onboarding Link:
 ${onboardingUrl}
 
 This is an automated message from Xpect Group.
-      `
-    };
+      `;
 
-    const info = await transporter.sendMail(mailOptions);
-    
+    const { data, error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM,
+      to: [email],
+      subject,
+      html,
+      text
+    });
+
+    if (error) {
+      console.error('❌ Resend error resending OTP email:', error);
+      throw new Error('Failed to send email');
+    }
+
     console.log('✅ OTP resend email sent:', {
-      messageId: info.messageId,
+      messageId: data?.id,
       to: email
     });
 
     return {
       success: true,
-      messageId: info.messageId,
+      messageId: data?.id,
       to: email
     };
   } catch (error) {
     console.error('❌ Error resending OTP email:', error);
-    throw new Error(`Failed to resend OTP email: ${error.message}`);
+    throw new Error('Failed to send email');
   }
 };
